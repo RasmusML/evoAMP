@@ -50,7 +50,7 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, latent_dim: int, hidden_dim: int, output_dim: int, seq_start_embedding: int):
+    def __init__(self, latent_dim: int, hidden_dim: int, output_dim: int, seq_start_embedding: torch.Tensor):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.output_dim = output_dim
@@ -59,7 +59,7 @@ class Decoder(nn.Module):
         self.ar_gru = AutoregressiveModule(nn.GRUCell, nn.Linear, output_dim, hidden_dim)
         self.z_to_hidden = nn.Linear(latent_dim, hidden_dim)
 
-    def forward(self, z, sequence_length):
+    def forward(self, z: torch.Tensor, sequence_length: int):
         x0 = self.seq_start_embedding.repeat(z.size(0), 1)
         h0 = F.relu(self.z_to_hidden(z))
         xs, _ = self.ar_gru(x0, h0, sequence_length)
@@ -67,7 +67,7 @@ class Decoder(nn.Module):
 
 
 class VAE(nn.Module):
-    def __init__(self, input_dim: int, latent_dim: int, hidden_dim: int, seq_start_embedding: int):
+    def __init__(self, input_dim: int, latent_dim: int, hidden_dim: int, seq_start_embedding: torch.Tensor):
         super().__init__()
         self.encoder = Encoder(input_dim, hidden_dim, latent_dim)
         self.decoder = Decoder(latent_dim, hidden_dim, input_dim, seq_start_embedding)

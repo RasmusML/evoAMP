@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from typing import Callable
 
 import pandas as pd
 import torch
@@ -34,7 +35,7 @@ class EvoAMP:
         seq_start_embedding = one_hot(torch.tensor(TOKEN_TO_ID[START_TOKEN]), self.input_dim)
         self.module = VAE(self.input_dim, latent_dim, hidden_dim, seq_start_embedding.to(torch.float32))
 
-    def train(self, df: pd.DataFrame, train_kwargs: dict = None) -> dict:
+    def train(self, df: pd.DataFrame, train_kwargs: dict = None, log_callback: Callable = None) -> dict:
         if train_kwargs is None:
             train_kwargs = {}
 
@@ -102,6 +103,7 @@ class EvoAMP:
             train_losses += [sum(train_loss) / len(train_loss)]
 
             logger.info(f"Epoch {epoch + 1}/{epochs}, Train Loss: {train_losses[-1]}")
+            _trigger_callback(log_callback, {"train_loss": train_losses[-1]})
 
             if val_set_len > 0:
                 val_loss = []
@@ -129,6 +131,7 @@ class EvoAMP:
                 val_losses += [sum(val_loss) / len(val_loss)]
 
                 logger.info(f"Epoch {epoch + 1}/{epochs}, Val Loss: {val_losses[-1]}")
+                _trigger_callback(log_callback, {"val_loss": val_losses[-1]})
 
         results = {}
         results["train_losses"] = train_losses
@@ -198,4 +201,12 @@ class EvoAMP:
 
         model = EvoAMP(**cfg)
         model.module.load_state_dict(torch.load(model_path))
+
         return model
+
+
+def _trigger_callback(callback: Callable, data: dict):
+    if callback is None:
+        return
+
+    callback(data)
