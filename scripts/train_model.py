@@ -39,9 +39,7 @@ def main(config):
     if cfg_data["n_seqs"] is not None:
         df = df.iloc[: cfg_data["n_seqs"]]
 
-    model = EvoAMP(**cfg["model"])
-
-    # Logging
+    # Setup logging
     cfg_logging = cfg["logging"]
     if cfg_logging["use_wandb"]:
         dict_config = OmegaConf.to_container(cfg, resolve=True)
@@ -57,6 +55,7 @@ def main(config):
         callback = None
 
     # Train model
+    model = EvoAMP(**cfg["model"])
     history = model.train(df, cfg["train"], log_callback=callback)
 
     # Save results

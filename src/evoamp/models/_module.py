@@ -38,12 +38,12 @@ class Encoder(nn.Module):
         _, h = self.gru(x, h0)
         h = F.relu(h.squeeze(0))  # (batch_size, hidden_dim)
 
-        mean = self.mean(h)
-        log_var = self.var(h)
-        var = torch.exp(log_var)
+        z_mean = self.mean(h)
+        z_log_var = self.var(h)
+        z_var = torch.exp(z_log_var)
 
-        pz = Normal(torch.zeros_like(mean), torch.ones_like(var))
-        qz = Normal(mean, var)  # (batch_size, latent_dim)
+        pz = Normal(torch.zeros_like(z_mean), torch.ones_like(z_var))
+        qz = Normal(z_mean, z_var)  # (batch_size, latent_dim)
         z = qz.rsample()
 
         return {"z": z, "qz": qz, "pz": pz}

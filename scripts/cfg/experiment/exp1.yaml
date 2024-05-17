@@ -2,19 +2,20 @@ seed: 123
 
 data:
   dataset_path: "./data/processed/amp_8_35.csv"
-  n_seqs: 100
+  n_seqs: 1000
 
 model:
-  hidden_dim: 32
-  latent_dim: 16
+  latent_dim: 100
+  hidden_dim: 64
 
 train:
-  epochs: 30
+  val_split: 0.1
+  epochs: 100
   batch_size: 64
   lr: 0.001
 
 logging:
-  use_wandb: False
+  use_wandb: True
 
 visualize:
-  plot_loss: True
+  plot_loss: False
