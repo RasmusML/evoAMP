@@ -1,0 +1,14 @@
+seed: 123
+
+data:
+  dataset_path: "./data/processed/amp_8_35.csv"
+  n_samples: 100
+
+model:
+  hidden_dim: 32
+  latent_dim: 16
+
+train:
+  epochs: 10
+  batch_size: 64
+  lr: 0.001

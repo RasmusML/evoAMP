@@ -34,32 +34,32 @@ class EvoAMP:
         seq_start_embedding = one_hot(torch.tensor(TOKEN_TO_ID[START_TOKEN]), self.input_dim)
         self.module = VAE(self.input_dim, latent_dim, hidden_dim, seq_start_embedding.to(torch.float32))
 
-    def train(self, df: pd.DataFrame, train_kwargs: dict = None):
+    def train(self, df: pd.DataFrame, train_kwargs: dict = None) -> dict:
         if train_kwargs is None:
             train_kwargs = {}
 
         batch_size = train_kwargs.get("batch_size", 64)
-        val_percent = train_kwargs.get("val_percent", 0.0)
-        lr = train_kwargs.get("lr", 0.01)
+        val_split = train_kwargs.get("val_split", 0.0)
+        lr = train_kwargs.get("lr", 0.001)
         epochs = train_kwargs.get("epochs", 10)
-        beta = train_kwargs.get("beta", 1.0)
+        kl_weight = train_kwargs.get("kl_weight", 1.0)
         sequence_padding = train_kwargs.get("sequence_padding", 0)
 
         dataset = AMPDataset(df)
-        train_set_len = int(len(dataset) * (1 - val_percent))
+        train_set_len = int(len(dataset) * (1 - val_split))
         val_set_len = len(dataset) - train_set_len
         train_set, val_set = torch.utils.data.random_split(dataset, [train_set_len, val_set_len])
 
         train_loader = AMPDataLoader(train_set, batch_size=batch_size, shuffle=True)
-        # val_loader = AMPDataLoader(val_set, batch_size=batch_size, shuffle=False)
+        val_loader = AMPDataLoader(val_set, batch_size=batch_size, shuffle=False)
 
         optimizer = torch.optim.Adam(self.module.parameters(), lr=lr)
 
-        def elbo(xs, xs_length, xs_hat, qz, pz, beta):
+        def _elbo(xs, xs_length, xs_hat, qz, pz, kl_weight=1.0):
             xs_hat = xs_hat.permute(1, 0, 2)  # (batch_size, seq_len, input_dim)
 
             kl = kl_divergence(qz, pz).sum(dim=-1)
-            weighted_kl = kl * beta
+            weighted_kl = kl * kl_weight
 
             for i, length in enumerate(xs_length):
                 xs_hat[i, length:] = 0
@@ -70,6 +70,9 @@ class EvoAMP:
             loss = (recon_loss + weighted_kl).mean()
 
             return loss
+
+        train_losses = []
+        val_losses = []
 
         for epoch in range(epochs):
             train_loss = []
@@ -83,20 +86,57 @@ class EvoAMP:
                 inference_output, generative_output = self.module(seqs_one_hot, max_sequence_length)
 
                 optimizer.zero_grad()
-                loss = elbo(
+                loss = _elbo(
                     seqs,
                     seq_lengths,
                     generative_output["xs"],
                     inference_output["qz"],
                     inference_output["pz"],
-                    beta,
+                    kl_weight,
                 )
                 loss.backward()
                 optimizer.step()
 
                 train_loss += [loss.item()]
 
-            logger.info(f"Epoch {epoch + 1}/{epochs}, Train Loss: {sum(train_loss) / len(train_loss)}")
+            train_losses += [sum(train_loss) / len(train_loss)]
+
+            logger.info(f"Epoch {epoch + 1}/{epochs}, Train Loss: {train_losses[-1]}")
+
+            if val_set_len > 0:
+                val_loss = []
+
+                self.module.eval()
+
+                for batch in val_loader:
+                    seqs, seq_lengths, is_amps = batch
+                    seqs_one_hot = one_hot(seqs, self.input_dim).permute(1, 0, 2).to(torch.float32)
+                    max_sequence_length = max(seq_lengths) + sequence_padding
+
+                    inference_output, generative_output = self.module(seqs_one_hot, max_sequence_length)
+
+                    loss = _elbo(
+                        seqs,
+                        seq_lengths,
+                        generative_output["xs"],
+                        inference_output["qz"],
+                        inference_output["pz"],
+                        kl_weight,
+                    )
+
+                    val_loss += [loss.item()]
+
+                val_losses += [sum(val_loss) / len(val_loss)]
+
+                logger.info(f"Epoch {epoch + 1}/{epochs}, Val Loss: {val_losses[-1]}")
+
+        results = {}
+        results["train_losses"] = train_losses
+
+        if val_set_len > 0:
+            results["val_losses"] = val_losses
+
+        return results
 
     def sample(
         self, reference_sequence: str, is_amp: int, n_samples: int = 1, sequence_padding: int = 0
