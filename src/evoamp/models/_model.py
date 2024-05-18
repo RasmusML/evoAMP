@@ -54,6 +54,11 @@ class EvoAMP:
         kl_weight = train_kwargs.get("kl_weight", 1.0)
         sequence_padding = train_kwargs.get("sequence_padding", 0)
 
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.module.to(device)
+
+        logger.info(f"Training on {device}")
+
         dataset = AMPDataset(df)
         train_set_len = int(len(dataset) * (1 - val_split))
         val_set_len = len(dataset) - train_set_len
@@ -75,7 +80,7 @@ class EvoAMP:
             # However, MuE takes logits and assumed there probs sum to 1, so to keep the implementation similar we opt for option 1.
 
             # Option 1
-            mask = torch.arange(xs_hat.shape[1]).unsqueeze(0) < torch.tensor(xs_length).unsqueeze(1)
+            mask = torch.arange(xs_hat.shape[1]).unsqueeze(0) < xs_length.clone().detach().unsqueeze(1)
             xs_hat = xs_hat * mask.unsqueeze(-1).float()
             px = Categorical(logits=xs_hat)
             recon_loss = -px.log_prob(xs).sum(dim=-1)  # (batch_size)
@@ -100,6 +105,11 @@ class EvoAMP:
             self.module.train()
             for batch in train_loader:
                 seqs, seq_lengths, is_amps = batch
+
+                seqs = seqs.to(device)
+                seq_lengths = seq_lengths.to(device)
+                is_amps = is_amps.to(device)
+
                 max_sequence_length = seqs.shape[-1] + sequence_padding
 
                 inference_output, generative_output = self.module(seqs, max_sequence_length)
@@ -114,6 +124,7 @@ class EvoAMP:
                     kl_weight,
                 )
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.module.parameters(), 1.0)
                 optimizer.step()
 
                 train_loss += [loss.item()]
@@ -130,6 +141,11 @@ class EvoAMP:
 
                 for batch in val_loader:
                     seqs, seq_lengths, is_amps = batch
+
+                    seqs = seqs.to(device)
+                    seq_lengths = seq_lengths.to(device)
+                    is_amps = is_amps.to(device)
+
                     max_sequence_length = seqs.shape[-1] + sequence_padding
 
                     inference_output, generative_output = self.module(seqs, max_sequence_length)
@@ -155,6 +171,8 @@ class EvoAMP:
 
         if val_set_len > 0:
             results["val_losses"] = val_losses
+
+        self.module.cpu()
 
         return results
 

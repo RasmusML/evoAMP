@@ -40,6 +40,9 @@ def _amp_collate_fn(batch):
     for i, seq in enumerate(seqs):
         padded_seqs[i, : lengths[i]] = seq
 
+    lengths = torch.tensor(lengths)
+    is_amps = torch.tensor(is_amps)
+
     return padded_seqs, lengths, is_amps
 
 

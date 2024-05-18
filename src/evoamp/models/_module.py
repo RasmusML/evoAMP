@@ -32,7 +32,7 @@ class Encoder(nn.Module):
 
     def forward(self, x: torch.Tensor):
         emb = self.embedding(x)  # (batch_size, seq_len, embedding_dim)
-        h0 = torch.zeros(self.directions, x.size(0), self.hidden_dim)
+        h0 = torch.zeros(self.directions, x.size(0), self.hidden_dim).to(x.device)
         s, _ = self.gru1(emb, h0)  # (batch_size, seq_len, hidden_dim * directions)
         _, h = self.gru2(s, h0)  # (directions, batch_size, hidden_dim)
         h = h.permute(1, 0, 2).reshape(x.size(0), -1)  # (batch_size, directions * hidden_dim)
@@ -52,12 +52,12 @@ class Decoder(nn.Module):
         super().__init__()
 
         self.ar_gru = AutoregressiveRNNBase(nn.GRU(latent_dim, latent_dim, batch_first=True))
-        self.lstm = nn.LSTM(latent_dim, lstm_dim, dropout=0.1, batch_first=True)
+        self.lstm = nn.LSTM(latent_dim, lstm_dim, batch_first=True)
         self.fc = nn.Linear(lstm_dim, output_dim)
         self.pz = Normal(torch.zeros(latent_dim), torch.ones(latent_dim))
 
     def forward(self, z: torch.Tensor, sequence_length: int):
-        x0 = torch.zeros(z.shape[0], 1, z.shape[-1])
+        x0 = torch.zeros(z.shape[0], 1, z.shape[-1]).to(z.device)
         out, _ = self.ar_gru(x0, z.unsqueeze(0), sequence_length)
         out, _ = self.lstm(out)
         xs = self.fc(out)
