@@ -13,7 +13,7 @@ import wandb
 logger = logging.getLogger(__name__)
 
 
-def plot_loss(history, output_dir):
+def _plot_loss(history, output_dir):
     fig, ax = plt.subplots(figsize=(6, 3))
     ax.plot(history["train_losses"], label="train")
     if "val_losses" in history:
@@ -26,6 +26,7 @@ def plot_loss(history, output_dir):
 
 @hydra.main(config_path="cfg", config_name="config", version_base="1.2")
 def main(config):
+    """Train a VAE model on AMP sequences."""
     logger.info(f"config: \n {OmegaConf.to_yaml(config)}")
 
     output_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
@@ -56,18 +57,22 @@ def main(config):
         callback = None
 
     # Train model
-    cfg_encoder = cfg["model"]["encoder"]
+    cfg_model = cfg["model"]
+    cfg_encoder = cfg_model["encoder"]
+    cfg_decoder = cfg_model["decoder"]
+
     model = EvoAMP(
-        embedding_dim=cfg_encoder["embedding_dim"],
-        latent_dim=cfg_encoder["latent_dim"],
-        hidden_dim=cfg_encoder["hidden_dim"],
+        encoder_embedding_dim=cfg_encoder["embedding_dim"],
+        encoder_gru_dim=cfg_encoder["gru_dim"],
+        latent_dim=cfg_model["latent_dim"],
+        decoder_lstm_dim=cfg_decoder["lstm_dim"],
     )
     history = model.train(df, cfg["train"], log_callback=callback)
 
     # Save results
     cfg_visualize = cfg["visualize"]
     if cfg_visualize["plot_loss"]:
-        plot_loss(history, output_dir)
+        _plot_loss(history, output_dir)
 
     # Save model
     model_dir = os.path.join(output_dir, "pretrained_model")

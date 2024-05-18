@@ -5,19 +5,22 @@ data:
   n_seqs: 2
 
 model:
+  latent_dim: 64 # 64
   encoder:
-    embedding_dim: 50 #100
-    latent_dim: 64 # 64
-    hidden_dim: 128 # 128
-    #min_kl_weight: 1e-4
-    #max_kl_weight: 1e-2
-    #rec_weight: 64.0
+    embedding_dim: 100 #100
+    gru_dim: 128 # 128
+  decoder:
+    lstm_dim: 100 # 100
+
 
 train:
-  val_split: 0
+  val_split: 0.0
   epochs: 800
   batch_size: 2
-  lr: 0.001
+  lr: 0.003
+  #min_kl_weight: 1e-4
+  #max_kl_weight: 1e-2
+  #rec_weight: 64.0
 
 logging:
   use_wandb: False
