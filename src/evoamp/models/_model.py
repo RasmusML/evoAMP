@@ -191,7 +191,7 @@ class EvoAMP:
 
         if reference_sequence is None:
             # sample using prior z
-            pz = self.module.decoder._get_prior().expand([1, -1])
+            pz = self.module.decoder.get_prior_latent_distribution().expand([1, -1])
         else:
             # sample using posterior z given reference sequence
             seq = prepare_sequence(reference_sequence)

@@ -63,9 +63,9 @@ class Decoder(nn.Module):
         out, _ = self.ar_gru(x0, z.unsqueeze(0), sequence_length)
         out, _ = self.lstm(out)
         xs = self.fc(out)
-        return {"xs": xs, "pz": self._get_prior()}
+        return {"xs": xs, "pz": self.get_prior_latent_distribution()}
 
-    def _get_prior(self):
+    def get_prior_latent_distribution(self):
         return Normal(self.pz_mean, self.pz_var)
 
 
