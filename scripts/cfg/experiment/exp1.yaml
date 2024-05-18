@@ -12,15 +12,12 @@ model:
   decoder:
     lstm_dim: 100 # 100
 
-
 train:
-  val_split: 0.1
-  epochs: 300
+  epochs: 30
   batch_size: 64
+  val_split: 0.1
   lr: 3e-3
-  #min_kl_weight: 1e-4
-  #max_kl_weight: 1e-2
-  #rec_weight: 64.0
+  kl_weight: 1e-1
 
 logging:
   use_wandb: False

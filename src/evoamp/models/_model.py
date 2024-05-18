@@ -47,10 +47,10 @@ class EvoAMP:
         if train_kwargs is None:
             train_kwargs = {}
 
+        epochs = train_kwargs.get("epochs", 10)
         batch_size = train_kwargs.get("batch_size", 64)
         val_split = train_kwargs.get("val_split", 0.0)
         lr = train_kwargs.get("lr", 0.001)
-        epochs = train_kwargs.get("epochs", 10)
         kl_weight = train_kwargs.get("kl_weight", 1.0)
         sequence_padding = train_kwargs.get("sequence_padding", 0)
 
@@ -128,7 +128,7 @@ class EvoAMP:
                     kl_weight,
                 )
                 loss.backward()
-                #torch.nn.utils.clip_grad_norm_(self.module.parameters(), 1.0)
+                # torch.nn.utils.clip_grad_norm_(self.module.parameters(), 1.0)
                 optimizer.step()
 
                 train_loss += [loss.item()]
@@ -221,6 +221,16 @@ class EvoAMP:
         samples = [ids_to_sequence(sample) for sample in sample_ids]
 
         return samples
+
+    @torch.inference_mode()
+    def get_latent_representation(self, sequence: str, is_amp: int) -> torch.Tensor:
+        seq = prepare_sequence(sequence)
+        seq_ids = torch.tensor(sequence_to_ids(seq)).unsqueeze(0)
+
+        inference_output = self.module.encoder(seq_ids)
+        z = inference_output["qz"].mean.squeeze(0)
+
+        return z.numpy()
 
     def save(self, path_dir: str):
         if not os.path.exists(path_dir):
