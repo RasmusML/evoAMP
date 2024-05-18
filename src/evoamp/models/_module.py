@@ -57,14 +57,16 @@ class Decoder(nn.Module):
 
         self.register_buffer("pz_mean", torch.zeros(latent_dim))
         self.register_buffer("pz_var", torch.ones(latent_dim))
-        self.pz = Normal(self.pz_mean, self.pz_var)
 
     def forward(self, z: torch.Tensor, sequence_length: int):
         x0 = torch.zeros(z.shape[0], 1, z.shape[-1]).to(z.device)
         out, _ = self.ar_gru(x0, z.unsqueeze(0), sequence_length)
         out, _ = self.lstm(out)
         xs = self.fc(out)
-        return {"xs": xs, "pz": self.pz}
+        return {"xs": xs, "pz": self._get_prior()}
+
+    def _get_prior(self):
+        return Normal(self.pz_mean, self.pz_var)
 
 
 class VAE(nn.Module):

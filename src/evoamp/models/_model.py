@@ -128,7 +128,7 @@ class EvoAMP:
                     kl_weight,
                 )
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.module.parameters(), 1.0)
+                #torch.nn.utils.clip_grad_norm_(self.module.parameters(), 1.0)
                 optimizer.step()
 
                 train_loss += [loss.item()]
@@ -191,7 +191,7 @@ class EvoAMP:
 
         if reference_sequence is None:
             # sample using prior z
-            pz = self.module.decoder.pz.expand([1, -1])
+            pz = self.module.decoder._get_prior().expand([1, -1])
         else:
             # sample using posterior z given reference sequence
             seq = prepare_sequence(reference_sequence)
