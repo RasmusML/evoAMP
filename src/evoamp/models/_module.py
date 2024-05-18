@@ -54,7 +54,10 @@ class Decoder(nn.Module):
         self.ar_gru = AutoregressiveRNNBase(nn.GRU(latent_dim, latent_dim, batch_first=True))
         self.lstm = nn.LSTM(latent_dim, lstm_dim, batch_first=True)
         self.fc = nn.Linear(lstm_dim, output_dim)
-        self.pz = Normal(torch.zeros(latent_dim), torch.ones(latent_dim))
+
+        self.register_buffer("pz_mean", torch.zeros(latent_dim))
+        self.register_buffer("pz_var", torch.ones(latent_dim))
+        self.pz = Normal(self.pz_mean, self.pz_var)
 
     def forward(self, z: torch.Tensor, sequence_length: int):
         x0 = torch.zeros(z.shape[0], 1, z.shape[-1]).to(z.device)

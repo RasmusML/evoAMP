@@ -80,7 +80,9 @@ class EvoAMP:
             # However, MuE takes logits and assumed there probs sum to 1, so to keep the implementation similar we opt for option 1.
 
             # Option 1
-            mask = torch.arange(xs_hat.shape[1]).unsqueeze(0) < xs_length.clone().detach().unsqueeze(1)
+            mask = torch.arange(xs_hat.shape[1], device=xs.device).unsqueeze(0) < xs_length.clone().detach().unsqueeze(
+                1
+            )
             xs_hat = xs_hat * mask.unsqueeze(-1).float()
             px = Categorical(logits=xs_hat)
             recon_loss = -px.log_prob(xs).sum(dim=-1)  # (batch_size)
@@ -100,6 +102,8 @@ class EvoAMP:
         val_losses = []
 
         for epoch in range(epochs):
+            epoch_results = {}
+
             train_loss = []
 
             self.module.train()
@@ -130,9 +134,9 @@ class EvoAMP:
                 train_loss += [loss.item()]
 
             train_losses += [sum(train_loss) / len(train_loss)]
+            epoch_results["train_loss"] = train_losses[-1]
 
             logger.info(f"Epoch {epoch + 1}/{epochs}, Train Loss: {train_losses[-1]}")
-            _trigger_callback(log_callback, {"train_loss": train_losses[-1]})
 
             if val_set_len > 0:
                 val_loss = []
@@ -162,9 +166,12 @@ class EvoAMP:
                     val_loss += [loss.item()]
 
                 val_losses += [sum(val_loss) / len(val_loss)]
+                epoch_results["val_loss"] = val_losses[-1]
 
                 logger.info(f"Epoch {epoch + 1}/{epochs}, Val Loss: {val_losses[-1]}")
-                _trigger_callback(log_callback, {"val_loss": val_losses[-1]})
+
+            if log_callback is not None:
+                log_callback(epoch_results)
 
         results = {}
         results["train_losses"] = train_losses
@@ -245,13 +252,6 @@ class EvoAMP:
         model.module.load_state_dict(torch.load(model_path))
 
         return model
-
-
-def _trigger_callback(callback: Callable[[dict[str, Any]], None], data: dict[str, Any]):
-    if callback is None:
-        return
-
-    callback(data)
 
 
 def _extract_params(params: dict) -> dict:

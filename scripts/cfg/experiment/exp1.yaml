@@ -15,9 +15,9 @@ model:
 
 train:
   val_split: 0.1
-  epochs: 80
+  epochs: 300
   batch_size: 64
-  lr: 1e-3
+  lr: 3e-3
   #min_kl_weight: 1e-4
   #max_kl_weight: 1e-2
   #rec_weight: 64.0
