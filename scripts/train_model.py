@@ -27,7 +27,9 @@ def plot_loss(history, output_dir):
 @hydra.main(config_path="cfg", config_name="config", version_base="1.2")
 def main(config):
     logger.info(f"config: \n {OmegaConf.to_yaml(config)}")
+
     output_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
+    relative_output_dir = output_dir.split("outputs/")[-1]
 
     # Set seed
     cfg = config["experiment"]
@@ -43,7 +45,6 @@ def main(config):
     cfg_logging = cfg["logging"]
     if cfg_logging["use_wandb"]:
         dict_config = OmegaConf.to_container(cfg, resolve=True)
-        relative_output_dir = output_dir.split("outputs/")[-1]
 
         wandb.init(
             project="evoamp",
@@ -55,7 +56,12 @@ def main(config):
         callback = None
 
     # Train model
-    model = EvoAMP(**cfg["model"])
+    cfg_encoder = cfg["model"]["encoder"]
+    model = EvoAMP(
+        embedding_dim=cfg_encoder["embedding_dim"],
+        latent_dim=cfg_encoder["latent_dim"],
+        hidden_dim=cfg_encoder["hidden_dim"],
+    )
     history = model.train(df, cfg["train"], log_callback=callback)
 
     # Save results
@@ -66,6 +72,8 @@ def main(config):
     # Save model
     model_dir = os.path.join(output_dir, "pretrained_model")
     model.save(model_dir)
+
+    logger.info(f"Saving results to {relative_output_dir}")
 
 
 if __name__ == "__main__":

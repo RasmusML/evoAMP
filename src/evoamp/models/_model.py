@@ -25,15 +25,18 @@ logger = logging.getLogger(__name__)
 CONFIG_NAME = "config.json"
 MODEL_NAME = "model.pt"
 
+DEFAULT_MAX_SEQUENCE_LENGTH_FOR_SAMPLING = 50
+
 
 class EvoAMP:
-    def __init__(self, latent_dim: int, hidden_dim: int):
+    def __init__(self, embedding_dim: int, latent_dim: int, hidden_dim: int):
+        self.embedding_dim = embedding_dim
         self.latent_dim = latent_dim
         self.hidden_dim = hidden_dim
 
         self.input_dim = len(TOKEN_TO_ID)
         seq_start_embedding = one_hot(torch.tensor(TOKEN_TO_ID[START_TOKEN]), self.input_dim)
-        self.module = VAE(self.input_dim, latent_dim, hidden_dim, seq_start_embedding.to(torch.float32))
+        self.module = VAE(self.input_dim, embedding_dim, latent_dim, hidden_dim, seq_start_embedding.to(torch.float32))
 
     def train(self, df: pd.DataFrame, train_kwargs: dict = None, log_callback: Callable = None) -> dict:
         if train_kwargs is None:
@@ -51,7 +54,7 @@ class EvoAMP:
         val_set_len = len(dataset) - train_set_len
         train_set, val_set = torch.utils.data.random_split(dataset, [train_set_len, val_set_len])
 
-        train_loader = AMPDataLoader(train_set, batch_size=batch_size, shuffle=True)
+        train_loader = AMPDataLoader(train_set, batch_size=batch_size, shuffle=False)
         val_loader = AMPDataLoader(val_set, batch_size=batch_size, shuffle=False)
 
         optimizer = torch.optim.Adam(self.module.parameters(), lr=lr)
@@ -62,12 +65,17 @@ class EvoAMP:
             kl = kl_divergence(qz, pz).sum(dim=-1)
             weighted_kl = kl * kl_weight
 
-            for i, length in enumerate(xs_length):
-                xs_hat[i, length:] = 0
+            # In order to ignore padding tokens when computing the loss we could:
+            #   1. harcode the aminoacids logits for padding tokensn to the same (e.g., 0)
+            #   2. set the reconstruction loss to 0 for padding tokens
+            # Option 2. would make the loss independent of number of padding tokens and therefore easier to interpret.
+            # However, MuE takes logits and assumed there probs sum to 1, so to keep the implementation similar we opt for option 1.
+            mask = torch.arange(xs_hat.shape[1]).unsqueeze(0) < torch.tensor(xs_length).unsqueeze(1)
+            xs_hat = xs_hat * mask.unsqueeze(-1).float()
 
             px = Categorical(logits=xs_hat)
-
             recon_loss = -px.log_prob(xs).sum(dim=-1)
+
             loss = (recon_loss + weighted_kl).mean()
 
             return loss
@@ -81,10 +89,9 @@ class EvoAMP:
             self.module.train()
             for batch in train_loader:
                 seqs, seq_lengths, is_amps = batch
-                seqs_one_hot = one_hot(seqs, self.input_dim).permute(1, 0, 2).to(torch.float32)
-                max_sequence_length = max(seq_lengths) + sequence_padding
+                max_sequence_length = seqs.shape[-1] + sequence_padding
 
-                inference_output, generative_output = self.module(seqs_one_hot, max_sequence_length)
+                inference_output, generative_output = self.module(seqs, max_sequence_length)
 
                 optimizer.zero_grad()
                 loss = _elbo(
@@ -92,7 +99,7 @@ class EvoAMP:
                     seq_lengths,
                     generative_output["xs"],
                     inference_output["qz"],
-                    inference_output["pz"],
+                    generative_output["pz"],
                     kl_weight,
                 )
                 loss.backward()
@@ -112,17 +119,16 @@ class EvoAMP:
 
                 for batch in val_loader:
                     seqs, seq_lengths, is_amps = batch
-                    seqs_one_hot = one_hot(seqs, self.input_dim).permute(1, 0, 2).to(torch.float32)
                     max_sequence_length = max(seq_lengths) + sequence_padding
 
-                    inference_output, generative_output = self.module(seqs_one_hot, max_sequence_length)
+                    inference_output, generative_output = self.module(seqs, max_sequence_length)
 
                     loss = _elbo(
                         seqs,
                         seq_lengths,
                         generative_output["xs"],
                         inference_output["qz"],
-                        inference_output["pz"],
+                        generative_output["pz"],
                         kl_weight,
                     )
 
@@ -142,19 +148,33 @@ class EvoAMP:
         return results
 
     def sample(
-        self, reference_sequence: str, is_amp: int, n_samples: int = 1, sequence_padding: int = 0
+        self, n_samples: int = 1, is_amp: int = 1, reference_sequence: str = None, max_sequence_length: int = None
     ) -> list[list[str]]:
         self.module.eval()
 
-        seq = prepare_sequence(reference_sequence)
-        seq_ids = torch.tensor(sequence_to_ids(seq))
-        seq_one_hot = one_hot(seq_ids, self.input_dim).unsqueeze(0).permute(1, 0, 2).to(torch.float32)
-        max_sequence_length = len(seq_ids) + sequence_padding
+        if reference_sequence is not None:
+            seq = prepare_sequence(reference_sequence)
+            seq_ids = torch.tensor(sequence_to_ids(seq)).unsqueeze(0)
+
+        if max_sequence_length is None:
+            if reference_sequence is None:
+                max_sequence_length = DEFAULT_MAX_SEQUENCE_LENGTH_FOR_SAMPLING
+            else:
+                max_sequence_length = len(seq)
 
         sample_ids = []
         for _ in range(n_samples):
-            inference_output, generative_output = self.module(seq_one_hot, max_sequence_length)
-            sample = generative_output["xs"].permute(1, 0, 2).argmax(dim=-1).squeeze(0).tolist()
+            if reference_sequence is None:
+                # sample using prior z
+                pz = self.module.decoder.pz
+                z = pz.sample().unsqueeze(0)
+
+                generative_output = self.module.decoder(z, max_sequence_length)
+                sample = generative_output["xs"].permute(1, 0, 2).argmax(dim=-1).squeeze(0).tolist()
+            else:
+                # sample using posterior z given reference sequence
+                _, generative_output = self.module(seq_ids, max_sequence_length)
+                sample = generative_output["xs"].permute(1, 0, 2).argmax(dim=-1).squeeze(0).tolist()
 
             try:
                 end_index = sample.index(TOKEN_TO_ID[END_TOKEN]) + 1
@@ -182,6 +202,7 @@ class EvoAMP:
             raise FileExistsError(f"Model file already exists at {model_path}")
 
         cfg = {
+            "embedding_dim": self.embedding_dim,
             "latent_dim": self.latent_dim,
             "hidden_dim": self.hidden_dim,
         }
