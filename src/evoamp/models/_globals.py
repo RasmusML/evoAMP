@@ -1,7 +1,7 @@
-def _get_mappings(pad_token, start_token, end_token):
+def _get_mappings(pad_token):
     amino_acids = "ACDEFGHIKLMNPQRSTVWY"
 
-    tokens = [pad_token, start_token] + list(amino_acids) + [end_token]
+    tokens = [pad_token] + list(amino_acids)
 
     id_to_token = {}
     token_to_id = {}
@@ -13,14 +13,12 @@ def _get_mappings(pad_token, start_token, end_token):
     return id_to_token, token_to_id
 
 PAD_TOKEN = "<pad>"
-START_TOKEN = "<start>"
-END_TOKEN = "<end>"
 
-ID_TO_TOKEN, TOKEN_TO_ID = _get_mappings(PAD_TOKEN, START_TOKEN, END_TOKEN)
+ID_TO_TOKEN, TOKEN_TO_ID = _get_mappings(PAD_TOKEN)
 
 
 def prepare_sequence(sequence: str) -> list[str]:
-    return [START_TOKEN] + list(sequence) + [END_TOKEN]
+    return list(sequence)
 
 
 def sequence_to_ids(sequence: list[str]) -> list[int]:

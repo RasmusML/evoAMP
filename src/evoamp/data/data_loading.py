@@ -13,9 +13,11 @@ def _check_data(df):
 
 class AMPDataset(Dataset):
     def __init__(self, df):
-        self.df = df
-
         _check_data(df)
+
+        self.df = df.copy()
+        self.df["length"] = self.df["sequence"].apply(len)
+        self.df = self.df.sort_values("length").reset_index(drop=True)
 
     def __len__(self):
         return len(self.df)
