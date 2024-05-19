@@ -2,7 +2,7 @@ seed: 123
 
 data:
   dataset_path: "./data/processed/amp_8_35.csv"
-  n_seqs: 10000
+  n_seqs: 16000
 
 model:
   latent_dim: 64 # 64
@@ -13,11 +13,11 @@ model:
     lstm_dim: 100 # 100
 
 train:
-  epochs: 200
+  epochs: 300
   batch_size: 32
   val_split: 0.1
   lr: 1e-3
-  kl_weight: 1e-2
+  kl_weight: 1e-1
 
 logging:
   use_wandb: false

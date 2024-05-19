@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 CONFIG_NAME = "config.json"
 MODEL_NAME = "model.pt"
 
-DEFAULT_MAX_SEQUENCE_LENGTH_FOR_SAMPLING = 50
+DEFAULT_MAX_SEQUENCE_LENGTH_FOR_SAMPLING = 35
 
 
 class EvoAMP:

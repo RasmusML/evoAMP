@@ -4,3 +4,4 @@ torch
 hydra-core
 matplotlib
 wandb
+umap-learn
