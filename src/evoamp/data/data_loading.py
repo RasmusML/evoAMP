@@ -1,5 +1,5 @@
 import torch
-from evoamp.models._globals import prepare_sequence, sequence_to_ids
+from evoamp.models._globals import PAD_TOKEN, TOKEN_TO_ID, prepare_sequence, sequence_to_ids
 from torch.utils.data import DataLoader, Dataset
 
 
@@ -36,7 +36,8 @@ def _amp_collate_fn(batch):
 
     max_length = max(lengths)
 
-    padded_seqs = torch.zeros(len(seqs), max_length, dtype=torch.int64)
+    pad_id = TOKEN_TO_ID[PAD_TOKEN]
+    padded_seqs = torch.full((len(seqs), max_length), pad_id, dtype=torch.int64)
     for i, seq in enumerate(seqs):
         padded_seqs[i, : lengths[i]] = seq
 
