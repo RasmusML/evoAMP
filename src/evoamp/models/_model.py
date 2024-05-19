@@ -8,7 +8,7 @@ import pandas as pd
 import torch
 from evoamp.data.data_loading import AMPDataLoader, AMPDataset
 from evoamp.models._globals import (
-    END_TOKEN,
+    PAD_TOKEN,
     TOKEN_TO_ID,
     ids_to_sequence,
     prepare_sequence,
@@ -112,10 +112,9 @@ class EvoAMP:
 
             self.module.train()
             for batch in train_loader:
-                seqs, seq_lengths, is_amps = batch
+                seqs, is_amps = batch
 
                 seqs = seqs.to(device)
-                seq_lengths = seq_lengths.to(device)
                 is_amps = is_amps.to(device)
 
                 max_sequence_length = seqs.shape[-1] + sequence_padding
@@ -147,10 +146,9 @@ class EvoAMP:
                 self.module.eval()
 
                 for batch in val_loader:
-                    seqs, seq_lengths, is_amps = batch
+                    seqs, is_amps = batch
 
                     seqs = seqs.to(device)
-                    seq_lengths = seq_lengths.to(device)
                     is_amps = is_amps.to(device)
 
                     max_sequence_length = seqs.shape[-1] + sequence_padding
@@ -212,12 +210,9 @@ class EvoAMP:
             generative_output = self.module.decoder(z, max_sequence_length)
             sample = generative_output["xs"].argmax(dim=-1).squeeze(0).tolist()
 
-            try:
-                end_index = sample.index(TOKEN_TO_ID[END_TOKEN]) + 1
-            except ValueError:
-                end_index = len(sample)
+            while sample[-1] == TOKEN_TO_ID[PAD_TOKEN]:
+                sample = sample[:-1]
 
-            sample = sample[:end_index]
             sample_ids += [sample]
 
         samples = [ids_to_sequence(sample) for sample in sample_ids]
