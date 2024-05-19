@@ -3,6 +3,7 @@ import logging
 import os
 from typing import Any, Callable
 
+import numpy as np
 import pandas as pd
 import torch
 from evoamp.data.data_loading import AMPDataLoader, AMPDataset
@@ -136,7 +137,7 @@ class EvoAMP:
             train_losses += [sum(train_loss) / len(train_loss)]
             epoch_results["train_loss"] = train_losses[-1]
 
-            logger.info(f"Epoch {epoch + 1}/{epochs}, Train Loss: {train_losses[-1]}")
+            logger.info(f"Epoch {epoch + 1}/{epochs}, Train Loss: {train_losses[-1]:.2f}")
 
             if val_set_len > 0:
                 val_loss = []
@@ -168,7 +169,7 @@ class EvoAMP:
                 val_losses += [sum(val_loss) / len(val_loss)]
                 epoch_results["val_loss"] = val_losses[-1]
 
-                logger.info(f"Epoch {epoch + 1}/{epochs}, Val Loss: {val_losses[-1]}")
+                logger.info(f"Epoch {epoch + 1}/{epochs}, Val Loss: {val_losses[-1]:.2f}")
 
             if log_callback is not None:
                 log_callback(epoch_results)
@@ -223,7 +224,7 @@ class EvoAMP:
         return samples
 
     @torch.inference_mode()
-    def get_latent_representation(self, sequence: str, is_amp: int) -> torch.Tensor:
+    def get_latent_representation(self, sequence: str, is_amp: int) -> np.ndarray:
         seq = prepare_sequence(sequence)
         seq_ids = torch.tensor(sequence_to_ids(seq)).unsqueeze(0)
 
