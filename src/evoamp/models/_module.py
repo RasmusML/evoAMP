@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from evoamp.distributions import MuE, SequentialCategorical
+from evoamp.distributions._mue import Profile
 from torch.distributions import Normal
 
 
@@ -91,6 +92,8 @@ class Decoder(nn.Module):
             self.insert_logits = nn.Parameter(torch.zeros((M, 3, 2)))
             self.delete_logits = nn.Parameter(torch.zeros((M, 3, 2)))
 
+            self.mue_state_arrange = Profile(M)
+
     def forward(self, z: torch.Tensor, batch_sequence_length: int):
         x0 = torch.zeros(z.shape[0], 1, z.shape[-1]).to(z.device)
 
@@ -131,6 +134,7 @@ class Decoder(nn.Module):
                 insert_logits=norm_insert_logits,
                 delete_logits=norm_delete_logits,
                 substitute_logits=norm_substitute_logits,
+                state_arrange=self.mue_state_arrange,
             )
         else:
             raise ValueError(f"Invalid observation model: {self.observation_model}")

@@ -63,7 +63,6 @@ class EvoAMP:
         val_split = train_kwargs.get("val_split", 0.0)
         lr = train_kwargs.get("lr", 0.001)
         kl_weight = train_kwargs.get("kl_weight", 1.0)
-        sequence_padding = train_kwargs.get("sequence_padding", 0)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.module.to(device)
@@ -127,8 +126,7 @@ class EvoAMP:
                 seqs = seqs.to(device)
                 is_amps = is_amps.to(device)
 
-                max_sequence_length = seqs.shape[-1] + sequence_padding
-
+                max_sequence_length = seqs.shape[-1]
                 inference_output, generative_output = self.module(seqs, max_sequence_length)
 
                 optimizer.zero_grad()
@@ -161,8 +159,7 @@ class EvoAMP:
                     seqs = seqs.to(device)
                     is_amps = is_amps.to(device)
 
-                    max_sequence_length = seqs.shape[-1] + sequence_padding
-
+                    max_sequence_length = seqs.shape[-1]
                     inference_output, generative_output = self.module(seqs, max_sequence_length)
 
                     loss = _elbo(

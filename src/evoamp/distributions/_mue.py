@@ -4,35 +4,6 @@ from torch.distributions import Categorical, OneHotCategorical
 from torch.nn.functional import one_hot
 
 
-class MuE(torch.distributions.Distribution):
-    def __init__(
-        self,
-        precursor_seq_logits: torch.Tensor,
-        insert_seq_logits: torch.Tensor,
-        insert_logits: torch.Tensor,
-        delete_logits: torch.Tensor,
-        substitute_logits: torch.Tensor = None,
-    ):
-        self.statearrange = Profile(precursor_seq_logits.shape[-2], device=precursor_seq_logits.device)
-        initial_logits, transition_logits, observation_logits = self.statearrange(
-            precursor_seq_logits,
-            insert_seq_logits,
-            insert_logits,
-            delete_logits,
-            substitute_logits,
-        )
-
-        self.hmm = MissingDataDiscreteHMM(initial_logits, transition_logits, observation_logits)
-
-    def log_prob(self, value: torch.Tensor) -> torch.Tensor:
-        if value.dim() < 3:
-            value = one_hot(value, self.hmm.event_shape[1]).to(torch.float32)
-        return self.hmm.log_prob(value)
-
-    def sample(self, sample_shape: torch.Size = torch.Size()) -> torch.Tensor:
-        return self.hmm.sample(sample_shape)
-
-
 # from https://github.com/pyro-ppl/pyro/blob/dev/pyro/contrib/mue/statearrangers.py
 class Profile(nn.Module):
     """Profile HMM state arrangement.
@@ -82,13 +53,13 @@ class Profile(nn.Module):
         # ...transf -> transition matrix
         # We fix r_{M+1,j} = 1 for j in {0, 1, 2}
 
-        # self.register_buffer("r_transf_0", torch.zeros((M, 3, 2, K)))
-        # self.register_buffer("u_transf_0", torch.zeros((M, 3, 2, K)))
-        # self.register_buffer("null_transf_0", torch.zeros((K,)))
+        self.register_buffer("r_transf_0", torch.zeros((M, 3, 2, K)))
+        self.register_buffer("u_transf_0", torch.zeros((M, 3, 2, K)))
+        self.register_buffer("null_transf_0", torch.zeros((K,)))
 
-        self.r_transf_0 = torch.zeros((M, 3, 2, K)).to(self.device)
-        self.u_transf_0 = torch.zeros((M, 3, 2, K)).to(self.device)
-        self.null_transf_0 = torch.zeros((K,)).to(self.device)
+        # self.r_transf_0 = torch.zeros((M, 3, 2, K)).to(self.device)
+        # self.u_transf_0 = torch.zeros((M, 3, 2, K)).to(self.device)
+        # self.null_transf_0 = torch.zeros((K,)).to(self.device)
 
         m, g = -1, 0
         for gp in range(2):
@@ -123,13 +94,13 @@ class Profile(nn.Module):
                 else:
                     self.null_transf_0[kp] = 1
 
-        # self.register_buffer("r_transf", torch.zeros((M, 3, 2, K, K)))
-        # self.register_buffer("u_transf", torch.zeros((M, 3, 2, K, K)))
-        # self.register_buffer("null_transf", torch.zeros((K, K)))
+        self.register_buffer("r_transf", torch.zeros((M, 3, 2, K, K)))
+        self.register_buffer("u_transf", torch.zeros((M, 3, 2, K, K)))
+        self.register_buffer("null_transf", torch.zeros((K, K)))
 
-        self.r_transf = torch.zeros((M, 3, 2, K, K)).to(self.device)
-        self.u_transf = torch.zeros((M, 3, 2, K, K)).to(self.device)
-        self.null_transf = torch.zeros((K, K)).to(self.device)
+        # self.r_transf = torch.zeros((M, 3, 2, K, K)).to(self.device)
+        # self.u_transf = torch.zeros((M, 3, 2, K, K)).to(self.device)
+        # self.null_transf = torch.zeros((K, K)).to(self.device)
 
         for g in range(2):
             for m in range(M + g):
@@ -163,11 +134,11 @@ class Profile(nn.Module):
                         else:
                             self.null_transf[k, kp] = 1
 
-        # self.register_buffer("vx_transf", torch.zeros((M, K)))
-        # self.register_buffer("vc_transf", torch.zeros((M + 1, K)))
+        self.register_buffer("vx_transf", torch.zeros((M, K)))
+        self.register_buffer("vc_transf", torch.zeros((M + 1, K)))
 
-        self.vx_transf = torch.zeros((M, K)).to(self.device)
-        self.vc_transf = torch.zeros((M + 1, K)).to(self.device)
+        # self.vx_transf = torch.zeros((M, K)).to(self.device)
+        # self.vc_transf = torch.zeros((M + 1, K)).to(self.device)
 
         for g in range(2):
             for m in range(M + g):
@@ -243,6 +214,40 @@ class Profile(nn.Module):
 def mg2k(m, g, M):
     """Convert from (m, g) indexing to k indexing."""
     return m + M * g
+
+
+class MuE(torch.distributions.Distribution):
+    def __init__(
+        self,
+        precursor_seq_logits: torch.Tensor,
+        insert_seq_logits: torch.Tensor,
+        insert_logits: torch.Tensor,
+        delete_logits: torch.Tensor,
+        substitute_logits: torch.Tensor = None,
+        state_arrange: Profile = None,
+    ):
+        if state_arrange is None:
+            self.state_arrange = Profile(precursor_seq_logits.shape[-2])  # , device=precursor_seq_logits.device)
+        else:
+            self.state_arrange = state_arrange
+
+        initial_logits, transition_logits, observation_logits = self.state_arrange(
+            precursor_seq_logits,
+            insert_seq_logits,
+            insert_logits,
+            delete_logits,
+            substitute_logits,
+        )
+
+        self.hmm = MissingDataDiscreteHMM(initial_logits, transition_logits, observation_logits)
+
+    def log_prob(self, value: torch.Tensor) -> torch.Tensor:
+        if value.dim() < 3:
+            value = one_hot(value, self.hmm.event_shape[1]).to(torch.float32)
+        return self.hmm.log_prob(value)
+
+    def sample(self, sample_shape: torch.Size = torch.Size()) -> torch.Tensor:
+        return self.hmm.sample(sample_shape)
 
 
 class MissingDataDiscreteHMM(torch.distributions.Distribution):
