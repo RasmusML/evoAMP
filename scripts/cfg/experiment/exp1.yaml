@@ -5,6 +5,7 @@ data:
   n_seqs: 16000
 
 model:
+  observation_model: "mue"
   latent_dim: 64 # 64
   encoder:
     embedding_dim: 100 #100

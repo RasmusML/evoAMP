@@ -1,7 +1,9 @@
+from typing import Literal
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from evoamp.distributions import SequentialCategorical
+from evoamp.distributions import MuE, SequentialCategorical
 from torch.distributions import Normal
 
 
@@ -55,20 +57,47 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, latent_dim: int, lstm_dim: int, output_dim: int, dropout_prob: float):
+    def __init__(
+        self,
+        latent_dim: int,
+        lstm_dim: int,
+        output_dim: int,
+        dropout_prob: float,
+        observation_model: Literal["categorical", "mue"],
+        mue_max_latent_sequence_length: int = None,
+    ):
         super().__init__()
 
         self.dropout_prob = dropout_prob
         self.ar_gru = AutoregressiveRNNBase(nn.GRU(latent_dim, latent_dim, batch_first=True))
         self.lstm = nn.LSTM(latent_dim, lstm_dim, batch_first=True)
         self.fc = nn.Linear(lstm_dim, output_dim)
+        self.observation_model = observation_model
+        self.mue_max_latent_sequence_length = mue_max_latent_sequence_length
 
         self.register_buffer("pz_mean", torch.zeros(latent_dim))
         self.register_buffer("pz_var", torch.ones(latent_dim))
 
-    def forward(self, z: torch.Tensor, max_sequence_length: int):
+        if self.observation_model == "mue":
+            if mue_max_latent_sequence_length is None:
+                raise ValueError(
+                    "mue_max_latent_sequence_length must be set for MuE observation model, recommended value is `1.1 * max_sequence_length`"
+                )
+
+            M = mue_max_latent_sequence_length
+            D = output_dim  # vocab size
+
+            self.insert_seq_logits = nn.Parameter(torch.zeros((M + 1, D)))
+            self.insert_logits = nn.Parameter(torch.zeros((M, 3, 2)))
+            self.delete_logits = nn.Parameter(torch.zeros((M, 3, 2)))
+
+    def forward(self, z: torch.Tensor, batch_sequence_length: int):
         x0 = torch.zeros(z.shape[0], 1, z.shape[-1]).to(z.device)
-        out, _ = self.ar_gru(x0, z.unsqueeze(0), max_sequence_length)
+
+        sequence_length = (
+            self.mue_max_latent_sequence_length if self.observation_model == "mue" else batch_sequence_length
+        )
+        out, _ = self.ar_gru(x0, z.unsqueeze(0), sequence_length)
 
         out = F.relu(out)
         out = F.dropout(out, p=self.dropout_prob)
@@ -87,7 +116,24 @@ class Decoder(nn.Module):
         return Normal(self.pz_mean, self.pz_var)
 
     def _get_observation_distribution(self, xs):
-        return SequentialCategorical(logits=xs)
+        if self.observation_model == "categorical":
+            return SequentialCategorical(logits=xs)
+        elif self.observation_model == "mue":
+            norm_precursor_seq_logits = xs - xs.logsumexp(dim=-1, keepdim=True)
+            norm_insert_seq_logits = self.insert_seq_logits - self.insert_seq_logits.logsumexp(dim=-1, keepdim=True)
+            norm_insert_logits = self.insert_logits - self.insert_logits.logsumexp(dim=-1, keepdim=True)
+            norm_delete_logits = self.delete_logits - self.delete_logits.logsumexp(dim=-1, keepdim=True)
+            norm_substitute_logits = None
+
+            return MuE(
+                precursor_seq_logits=norm_precursor_seq_logits,
+                insert_seq_logits=norm_insert_seq_logits,
+                insert_logits=norm_insert_logits,
+                delete_logits=norm_delete_logits,
+                substitute_logits=norm_substitute_logits,
+            )
+        else:
+            raise ValueError(f"Invalid observation model: {self.observation_model}")
 
 
 class VAE(nn.Module):
@@ -99,12 +145,16 @@ class VAE(nn.Module):
         latent_dim: int,
         decoder_lstm_dim: int,
         dropout_prob: float = 0.3,
+        observation_model: Literal["categorical", "mue"] = "categorical",
+        mue_max_latent_sequence_length: int = None,
     ):
         super().__init__()
         self.encoder = Encoder(input_dim, encoder_embedding_dim, encoder_gru_dim, latent_dim, dropout_prob)
-        self.decoder = Decoder(latent_dim, decoder_lstm_dim, input_dim, dropout_prob)
+        self.decoder = Decoder(
+            latent_dim, decoder_lstm_dim, input_dim, dropout_prob, observation_model, mue_max_latent_sequence_length
+        )
 
-    def forward(self, x: torch.Tensor, max_sequence_length: int):
+    def forward(self, x: torch.Tensor, batch_sequence_length: int):
         inference_outputs = self.encoder(x)
-        generative_outputs = self.decoder(inference_outputs["z"], max_sequence_length)
+        generative_outputs = self.decoder(inference_outputs["z"], batch_sequence_length)
         return inference_outputs, generative_outputs

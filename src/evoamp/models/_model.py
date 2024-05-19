@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 import numpy as np
 import pandas as pd
@@ -34,10 +34,20 @@ class EvoAMP:
         encoder_gru_dim: int,
         latent_dim: int,
         decoder_lstm_dim: int,
+        observation_model: Literal["categorical", "mue"] = "categorical",
+        mue_max_latent_sequence_length: int = None,
     ):
         self.configs = _extract_params(locals())
         self.input_dim = len(TOKEN_TO_ID)
-        self.module = VAE(self.input_dim, encoder_embedding_dim, encoder_gru_dim, latent_dim, decoder_lstm_dim)
+        self.module = VAE(
+            self.input_dim,
+            encoder_embedding_dim,
+            encoder_gru_dim,
+            latent_dim,
+            decoder_lstm_dim,
+            observation_model=observation_model,
+            mue_max_latent_sequence_length=mue_max_latent_sequence_length,
+        )
 
     def train(
         self,

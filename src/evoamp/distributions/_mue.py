@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.distributions import Categorical, OneHotCategorical
+from torch.nn.functional import one_hot
 
 
 class MuE(torch.distributions.Distribution):
@@ -24,6 +25,8 @@ class MuE(torch.distributions.Distribution):
         self.hmm = MissingDataDiscreteHMM(initial_logits, transition_logits, observation_logits)
 
     def log_prob(self, value: torch.Tensor) -> torch.Tensor:
+        if value.dim() < 3:
+            value = one_hot(value, self.hmm.event_shape[1]).to(torch.float32)
         return self.hmm.log_prob(value)
 
     def sample(self, sample_shape: torch.Size = torch.Size()) -> torch.Tensor:
