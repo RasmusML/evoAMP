@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from evoamp.distributions import SequentialCategorical
 from torch.distributions import Normal
 
 
@@ -58,15 +59,23 @@ class Decoder(nn.Module):
         self.register_buffer("pz_mean", torch.zeros(latent_dim))
         self.register_buffer("pz_var", torch.ones(latent_dim))
 
-    def forward(self, z: torch.Tensor, sequence_length: int):
+    def forward(self, z: torch.Tensor, max_sequence_length: int):
         x0 = torch.zeros(z.shape[0], 1, z.shape[-1]).to(z.device)
-        out, _ = self.ar_gru(x0, z.unsqueeze(0), sequence_length)
+        out, _ = self.ar_gru(x0, z.unsqueeze(0), max_sequence_length)
         out, _ = self.lstm(out)
         xs = self.fc(out)
-        return {"xs": xs, "pz": self.get_prior_latent_distribution()}
 
-    def get_prior_latent_distribution(self):
+        return {
+            "xs": xs,
+            "px": self._get_observation_distribution(xs),
+            "pz": self._get_prior_latent_distribution(),
+        }
+
+    def _get_prior_latent_distribution(self):
         return Normal(self.pz_mean, self.pz_var)
+
+    def _get_observation_distribution(self, xs):
+        return SequentialCategorical(logits=xs)
 
 
 class VAE(nn.Module):

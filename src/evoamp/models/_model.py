@@ -17,7 +17,7 @@ from evoamp.models._globals import (
 
 # from torch.nn.utils.rnn import pack_padded_sequence, unpack_padded_sequence
 from evoamp.models._module import VAE
-from torch.distributions import Categorical, kl_divergence
+from torch.distributions import kl_divergence
 
 logger = logging.getLogger(__name__)
 
@@ -70,10 +70,12 @@ class EvoAMP:
 
         optimizer = torch.optim.Adam(self.module.parameters(), lr=lr)
 
-        def _elbo(xs, xs_length, xs_hat, qz, pz, kl_weight=1.0):
+        def _elbo(xs, px, qz, pz, kl_weight=1.0):
             kl = kl_divergence(qz, pz).sum(dim=-1)  # (batch_size)
             weighted_kl = kl * kl_weight
 
+            recon_loss = -px.log_prob(xs)  # (batch_size)
+            """
             # In order to ignore padding tokens when computing the loss we could:
             #   1. hardcode the aminoacids logits for padding tokensn to the same (e.g., 0)
             #   2. set the reconstruction loss to 0 for padding tokens
@@ -94,6 +96,7 @@ class EvoAMP:
             # recon_loss = -px.log_prob(xs)
             # recon_loss = recon_loss * mask.float()
             # recon_loss = recon_loss.sum(dim=-1)
+            """
 
             loss = (recon_loss + weighted_kl).mean()
 
@@ -122,8 +125,7 @@ class EvoAMP:
                 optimizer.zero_grad()
                 loss = _elbo(
                     seqs,
-                    seq_lengths,
-                    generative_output["xs"],
+                    generative_output["px"],
                     inference_output["qz"],
                     generative_output["pz"],
                     kl_weight,
@@ -157,8 +159,7 @@ class EvoAMP:
 
                     loss = _elbo(
                         seqs,
-                        seq_lengths,
-                        generative_output["xs"],
+                        generative_output["px"],
                         inference_output["qz"],
                         generative_output["pz"],
                         kl_weight,
@@ -192,7 +193,7 @@ class EvoAMP:
 
         if reference_sequence is None:
             # sample using prior z
-            pz = self.module.decoder.get_prior_latent_distribution().expand([1, -1])
+            pz = self.module.decoder._get_prior_latent_distribution().expand([1, -1])
         else:
             # sample using posterior z given reference sequence
             seq = prepare_sequence(reference_sequence)

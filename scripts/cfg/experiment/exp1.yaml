@@ -13,11 +13,11 @@ model:
     lstm_dim: 100 # 100
 
 train:
-  epochs: 200
+  epochs: 300
   batch_size: 32
   val_split: 0.1
-  lr: 2e-3
-  kl_weight: 1e-2
+  lr: 1e-3
+  kl_weight: 1e-3
 
 logging:
   use_wandb: false
