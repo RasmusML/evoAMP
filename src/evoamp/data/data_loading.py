@@ -1,3 +1,4 @@
+import pandas as pd
 import torch
 from evoamp.models._globals import PAD_TOKEN, TOKEN_TO_ID, prepare_sequence, sequence_to_ids
 from torch.utils.data import DataLoader, Dataset
@@ -17,7 +18,7 @@ def _check_data(df):
 
 
 class AMPDataset(Dataset):
-    def __init__(self, df, sort=True):
+    def __init__(self, df: pd.DataFrame, sort: bool = True):
         _check_data(df)
 
         self.df = df.copy()
@@ -30,7 +31,7 @@ class AMPDataset(Dataset):
     def __len__(self):
         return len(self.df)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int):
         row = self.df.iloc[idx]
 
         seq = prepare_sequence(row[SEQUENCE_COLUMN])
