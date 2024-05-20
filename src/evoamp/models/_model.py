@@ -6,9 +6,8 @@ from typing import Any, Callable, Literal
 import numpy as np
 import pandas as pd
 import torch
-from evoamp.data.data_loading import AMPDataLoader, AMPDataset
+from evoamp.data._data_loading import AMPDataLoader, AMPDataset
 from evoamp.models._globals import (
-    END_TOKEN,
     PAD_TOKEN,
     TOKEN_TO_ID,
     ids_to_sequence,

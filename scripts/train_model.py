@@ -15,11 +15,13 @@ logger = logging.getLogger(__name__)
 
 def _plot_loss(history, output_dir):
     fig, ax = plt.subplots(figsize=(6, 3))
-    ax.plot(history["train_losses"], label="train")
+    ax.plot(history["train_losses"], label="training")
     if "val_losses" in history:
-        ax.plot(history["val_losses"], label="val")
+        ax.plot(history["val_losses"], label="validation")
     ax.set_xlabel("Epoch")
     ax.set_ylabel("NLL")
+    ax.grid(True)
+    ax.set_axisbelow(True)
     ax.legend()
     fig.savefig(os.path.join(output_dir, "loss.png"), bbox_inches="tight")
 
