@@ -8,6 +8,7 @@ import pandas as pd
 import torch
 from evoamp.data._data_loading import AMPDataLoader, AMPDataset
 from evoamp.models._globals import (
+    END_TOKEN,
     PAD_TOKEN,
     TOKEN_TO_ID,
     ids_to_sequence,
