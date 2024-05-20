@@ -67,6 +67,7 @@ class Decoder(nn.Module):
         observation_model: Literal["categorical", "mue"],
         mue_max_latent_sequence_length: int = None,
         pad_token_id: int = None,
+        scoring_matrix_probabilities: torch.Tensor = None,
     ):
         super().__init__()
 
@@ -88,13 +89,22 @@ class Decoder(nn.Module):
                 )
 
             M = mue_max_latent_sequence_length
-            D = output_dim  # vocab size
+            D, B = output_dim, output_dim  # latent vocab size, obs. vocab size
 
             self.insert_seq_logits = nn.Parameter(torch.zeros((M + 1, D)))
 
             indel_scalar = 1.0
             self.insert_logits = nn.Parameter(torch.ones((M, 3, 2)) * indel_scalar)
             self.delete_logits = nn.Parameter(torch.ones((M, 3, 2)) * indel_scalar)
+
+            if scoring_matrix_probabilities is None:
+                substitution_matrix_prob = None
+            else:
+                S = scoring_matrix_probabilities.shape[0]
+                substitution_matrix_prob = torch.eye(D, B)
+                substitution_matrix_prob[:S, :S] = scoring_matrix_probabilities
+
+            self.register_buffer("substitute_logits", substitution_matrix_prob)
 
             self.mue_state_arrange = Profile(M)
 
@@ -130,7 +140,11 @@ class Decoder(nn.Module):
             norm_insert_seq_logits = self.insert_seq_logits - self.insert_seq_logits.logsumexp(dim=-1, keepdim=True)
             norm_insert_logits = self.insert_logits - self.insert_logits.logsumexp(dim=-1, keepdim=True)
             norm_delete_logits = self.delete_logits - self.delete_logits.logsumexp(dim=-1, keepdim=True)
-            norm_substitute_logits = None
+
+            if self.substitute_logits is not None:
+                norm_substitute_logits = self.substitute_logits - self.substitute_logits.logsumexp(dim=-1, keepdim=True)
+            else:
+                norm_substitute_logits = None
 
             return MuE(
                 precursor_seq_logits=norm_precursor_seq_logits,
@@ -157,6 +171,7 @@ class VAE(nn.Module):
         observation_model: Literal["categorical", "mue"] = "categorical",
         mue_max_latent_sequence_length: int = None,
         pad_token_id: int = None,
+        scoring_matrix_probabilities: torch.Tensor = None,
     ):
         super().__init__()
         self.encoder = Encoder(input_dim, encoder_embedding_dim, encoder_gru_dim, latent_dim, dropout_prob)
@@ -168,6 +183,7 @@ class VAE(nn.Module):
             observation_model,
             mue_max_latent_sequence_length,
             pad_token_id,
+            scoring_matrix_probabilities,
         )
 
     def forward(self, x: torch.Tensor, batch_sequence_length: int):

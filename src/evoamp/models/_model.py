@@ -18,6 +18,7 @@ from evoamp.models._globals import (
 
 # from torch.nn.utils.rnn import pack_padded_sequence, unpack_padded_sequence
 from evoamp.models._module import VAE
+from evoamp.scoring_matrices import SCORING_MATRICES
 from torch.distributions import kl_divergence
 
 logger = logging.getLogger(__name__)
@@ -37,9 +38,11 @@ class EvoAMP:
         decoder_lstm_dim: int,
         observation_model: Literal["categorical", "mue"] = "categorical",
         mue_max_latent_sequence_length: int = None,
+        scoring_matrix: Literal["PAM30", "BLOSUM62"] = None,
     ):
         self.configs = _extract_params(locals())
         self.input_dim = len(TOKEN_TO_ID)
+
         self.module = VAE(
             self.input_dim,
             encoder_embedding_dim,
@@ -49,6 +52,7 @@ class EvoAMP:
             observation_model=observation_model,
             mue_max_latent_sequence_length=mue_max_latent_sequence_length,
             pad_token_id=TOKEN_TO_ID[PAD_TOKEN],
+            scoring_matrix_probabilities=_prepare_scoring_matrix(scoring_matrix),
         )
 
     def train(
@@ -255,3 +259,15 @@ def _extract_params(params: dict) -> dict:
     params = params.copy()
     del params["self"]
     return params
+
+
+def _prepare_scoring_matrix(scoring_matrix: Literal["PAM30", "BLOSUM62"]) -> torch.Tensor:
+    if scoring_matrix is None:
+        return None
+
+    try:
+        scoring_matrix_prob = torch.tensor(SCORING_MATRICES[scoring_matrix])
+    except KeyError as e:
+        raise ValueError(f"Invalid scoring matrix: {scoring_matrix}") from e
+
+    return scoring_matrix_prob
