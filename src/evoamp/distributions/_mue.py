@@ -278,6 +278,12 @@ class MissingDataDiscreteHMM(torch.distributions.Distribution):
         to ``(batch_size, state_dim, categorical_size)``.
     """
 
+    arg_constraints = {
+        "initial_logits": torch.distributions.constraints.real,
+        "transition_logits": torch.distributions.constraints.independent(torch.distributions.constraints.real, 2),
+        "observation_logits": torch.distributions.constraints.independent(torch.distributions.constraints.real, 2),
+    }
+
     def __init__(self, initial_logits, transition_logits, observation_logits, validate_args=None):
         if initial_logits.dim() < 1:
             raise ValueError(
