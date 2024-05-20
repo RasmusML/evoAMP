@@ -47,6 +47,7 @@ class EvoAMP:
             decoder_lstm_dim,
             observation_model=observation_model,
             mue_max_latent_sequence_length=mue_max_latent_sequence_length,
+            pad_token_id=TOKEN_TO_ID[PAD_TOKEN],
         )
 
     def train(
@@ -74,7 +75,7 @@ class EvoAMP:
         val_set_len = len(dataset) - train_set_len
         train_set, val_set = torch.utils.data.random_split(dataset, [train_set_len, val_set_len])
 
-        train_loader = AMPDataLoader(train_set, batch_size=batch_size, shuffle=False)
+        train_loader = AMPDataLoader(train_set, batch_size=batch_size, shuffle=True)
         val_loader = AMPDataLoader(val_set, batch_size=batch_size, shuffle=False)
 
         optimizer = torch.optim.Adam(self.module.parameters(), lr=lr)
@@ -84,29 +85,6 @@ class EvoAMP:
             weighted_kl = kl * kl_weight
 
             recon_loss = -px.log_prob(xs)  # (batch_size)
-            """
-            # In order to ignore padding tokens when computing the loss we could:
-            #   1. hardcode the aminoacids logits for padding tokensn to the same (e.g., 0)
-            #   2. set the reconstruction loss to 0 for padding tokens
-            # Option 2. would make the loss independent of number of padding tokens and therefore easier to interpret.
-            # However, MuE takes logits and assumed there probs sum to 1, so to keep the implementation similar we opt for option 1.
-
-            # Option 1
-            mask = torch.arange(xs_hat.shape[1], device=xs.device).unsqueeze(0) < xs_length.clone().detach().unsqueeze(
-                1
-            )
-            xs_hat = xs_hat * mask.unsqueeze(-1).float()
-            px = Categorical(logits=xs_hat)
-            recon_loss = -px.log_prob(xs).sum(dim=-1)  # (batch_size)
-
-            # Option 2.
-            # mask = torch.arange(xs_hat.shape[1]).unsqueeze(0) < torch.tensor(xs_length).unsqueeze(1)
-            # px = Categorical(logits=xs_hat)
-            # recon_loss = -px.log_prob(xs)
-            # recon_loss = recon_loss * mask.float()
-            # recon_loss = recon_loss.sum(dim=-1)
-            """
-
             loss = (recon_loss + weighted_kl).mean()
 
             return loss
@@ -138,7 +116,7 @@ class EvoAMP:
                     kl_weight,
                 )
                 loss.backward()
-                # torch.nn.utils.clip_grad_norm_(self.module.parameters(), 1.0)
+                torch.nn.utils.clip_grad_value_(self.module.parameters(), 1.0)
                 optimizer.step()
 
                 train_loss += [loss.item()]

@@ -225,7 +225,10 @@ class MuE(torch.distributions.Distribution):
         delete_logits: torch.Tensor,
         substitute_logits: torch.Tensor = None,
         state_arrange: Profile = None,
+        pad_token_id: int = None,
     ):
+        self.pad_token_id = pad_token_id
+
         if state_arrange is None:
             self.state_arrange = Profile(precursor_seq_logits.shape[-2])  # , device=precursor_seq_logits.device)
         else:
@@ -244,6 +247,11 @@ class MuE(torch.distributions.Distribution):
     def log_prob(self, value: torch.Tensor) -> torch.Tensor:
         if value.dim() < 3:
             value = one_hot(value, self.hmm.event_shape[1]).to(torch.float32)
+
+        if self.pad_token_id is not None:
+            mask = value[..., self.pad_token_id] == 1.0
+            value[mask] = 0.0
+
         return self.hmm.log_prob(value)
 
     def sample(self, sample_shape: torch.Size = torch.Size()) -> torch.Tensor:

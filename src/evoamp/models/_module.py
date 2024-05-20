@@ -66,6 +66,7 @@ class Decoder(nn.Module):
         dropout_prob: float,
         observation_model: Literal["categorical", "mue"],
         mue_max_latent_sequence_length: int = None,
+        pad_token_id: int = None,
     ):
         super().__init__()
 
@@ -75,6 +76,7 @@ class Decoder(nn.Module):
         self.fc = nn.Linear(lstm_dim, output_dim)
         self.observation_model = observation_model
         self.mue_max_latent_sequence_length = mue_max_latent_sequence_length
+        self.pad_token_id = pad_token_id
 
         self.register_buffer("pz_mean", torch.zeros(latent_dim))
         self.register_buffer("pz_var", torch.ones(latent_dim))
@@ -89,8 +91,10 @@ class Decoder(nn.Module):
             D = output_dim  # vocab size
 
             self.insert_seq_logits = nn.Parameter(torch.zeros((M + 1, D)))
-            self.insert_logits = nn.Parameter(torch.zeros((M, 3, 2)))
-            self.delete_logits = nn.Parameter(torch.zeros((M, 3, 2)))
+
+            indel_scalar = 1.0
+            self.insert_logits = nn.Parameter(torch.ones((M, 3, 2)) * indel_scalar)
+            self.delete_logits = nn.Parameter(torch.ones((M, 3, 2)) * indel_scalar)
 
             self.mue_state_arrange = Profile(M)
 
@@ -118,9 +122,9 @@ class Decoder(nn.Module):
     def _get_prior_latent_distribution(self):
         return Normal(self.pz_mean, self.pz_var)
 
-    def _get_observation_distribution(self, xs):
+    def _get_observation_distribution(self, xs: torch.Tensor):
         if self.observation_model == "categorical":
-            return SequentialCategorical(logits=xs)
+            return SequentialCategorical(logits=xs, pad_token_id=self.pad_token_id)
         elif self.observation_model == "mue":
             norm_precursor_seq_logits = xs - xs.logsumexp(dim=-1, keepdim=True)
             norm_insert_seq_logits = self.insert_seq_logits - self.insert_seq_logits.logsumexp(dim=-1, keepdim=True)
@@ -135,6 +139,7 @@ class Decoder(nn.Module):
                 delete_logits=norm_delete_logits,
                 substitute_logits=norm_substitute_logits,
                 state_arrange=self.mue_state_arrange,
+                pad_token_id=self.pad_token_id,
             )
         else:
             raise ValueError(f"Invalid observation model: {self.observation_model}")
@@ -151,11 +156,18 @@ class VAE(nn.Module):
         dropout_prob: float = 0.3,
         observation_model: Literal["categorical", "mue"] = "categorical",
         mue_max_latent_sequence_length: int = None,
+        pad_token_id: int = None,
     ):
         super().__init__()
         self.encoder = Encoder(input_dim, encoder_embedding_dim, encoder_gru_dim, latent_dim, dropout_prob)
         self.decoder = Decoder(
-            latent_dim, decoder_lstm_dim, input_dim, dropout_prob, observation_model, mue_max_latent_sequence_length
+            latent_dim,
+            decoder_lstm_dim,
+            input_dim,
+            dropout_prob,
+            observation_model,
+            mue_max_latent_sequence_length,
+            pad_token_id,
         )
 
     def forward(self, x: torch.Tensor, batch_sequence_length: int):
