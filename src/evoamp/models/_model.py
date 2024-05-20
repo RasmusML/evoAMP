@@ -38,7 +38,7 @@ class EvoAMP:
         decoder_lstm_dim: int,
         observation_model: Literal["categorical", "mue"] = "categorical",
         mue_max_latent_sequence_length: int = None,
-        scoring_matrix: Literal["PAM30", "BLOSUM62"] = None,
+        scoring_matrix: Literal["PAM30", "BLOSUM62", "BLOSUM80"] = None,
     ):
         self.configs = _extract_params(locals())
         self.input_dim = len(TOKEN_TO_ID)
@@ -261,7 +261,7 @@ def _extract_params(params: dict) -> dict:
     return params
 
 
-def _prepare_scoring_matrix(scoring_matrix: Literal["PAM30", "BLOSUM62"]) -> torch.Tensor:
+def _prepare_scoring_matrix(scoring_matrix: Literal["PAM30", "BLOSUM62", "BLOSUM80"]) -> torch.Tensor:
     if scoring_matrix is None:
         return None
 

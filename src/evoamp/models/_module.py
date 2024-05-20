@@ -104,7 +104,7 @@ class Decoder(nn.Module):
                 substitution_matrix_prob = torch.eye(D, B)
                 substitution_matrix_prob[:S, :S] = scoring_matrix_probabilities
 
-                def _convert_probability_to_logit(prob_matrix: torch.tensor, eps=1e-6) -> torch.tensor:
+                def _convert_probability_to_logit(prob_matrix: torch.Tensor, eps=1e-6) -> torch.Tensor:
                     prob_matrix = torch.clamp(prob_matrix, eps, 1 - eps)
                     logit_matrix = torch.log(prob_matrix / (1 - prob_matrix))
                     return logit_matrix
