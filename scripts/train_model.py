@@ -63,7 +63,7 @@ def main(config):
     cfg_encoder = cfg_model["encoder"]
     cfg_decoder = cfg_model["decoder"]
 
-    if cfg_model["observation_model"] == "mue":
+    if cfg_decoder["observation_model"] == "mue":
         max_sequence_length = df["sequence"].str.len().max()
         mue_max_latent_sequence_length = int(max_sequence_length * 1.1)
     else:
@@ -74,9 +74,9 @@ def main(config):
         encoder_gru_dim=cfg_encoder["gru_dim"],
         latent_dim=cfg_model["latent_dim"],
         decoder_lstm_dim=cfg_decoder["lstm_dim"],
-        observation_model=cfg_model["observation_model"],
+        observation_model=cfg_decoder["observation_model"],
         mue_max_latent_sequence_length=mue_max_latent_sequence_length,
-        scoring_matrix=cfg_model["scoring_matrix"],
+        scoring_matrix=cfg_decoder["scoring_matrix"],
     )
     history = model.train(df, cfg["train"], log_callback=callback)
 
