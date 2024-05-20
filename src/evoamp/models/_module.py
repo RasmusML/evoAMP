@@ -104,7 +104,14 @@ class Decoder(nn.Module):
                 substitution_matrix_prob = torch.eye(D, B)
                 substitution_matrix_prob[:S, :S] = scoring_matrix_probabilities
 
-            self.register_buffer("substitute_logits", substitution_matrix_prob)
+                def _convert_probability_to_logit(prob_matrix: torch.tensor, eps=1e-6) -> torch.tensor:
+                    prob_matrix = torch.clamp(prob_matrix, eps, 1 - eps)
+                    logit_matrix = torch.log(prob_matrix / (1 - prob_matrix))
+                    return logit_matrix
+
+                substitute_logits = _convert_probability_to_logit(substitution_matrix_prob)
+
+            self.register_buffer("substitute_logits", substitute_logits)
 
             self.mue_state_arrange = Profile(M)
 
