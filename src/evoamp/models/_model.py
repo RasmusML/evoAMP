@@ -65,6 +65,7 @@ class EvoAMP:
         val_split = train_kwargs.get("val_split", 0.0)
         lr = train_kwargs.get("lr", 0.001)
         kl_weight = train_kwargs.get("kl_weight", 1.0)
+        shuffle_train_set = train_kwargs.get("shuffle_train_set", False)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.module.to(device)
@@ -76,7 +77,7 @@ class EvoAMP:
         val_set_len = len(dataset) - train_set_len
         train_set, val_set = torch.utils.data.random_split(dataset, [train_set_len, val_set_len])
 
-        train_loader = AMPDataLoader(train_set, batch_size=batch_size, shuffle=True)
+        train_loader = AMPDataLoader(train_set, batch_size=batch_size, shuffle=shuffle_train_set)
         val_loader = AMPDataLoader(val_set, batch_size=batch_size, shuffle=False)
 
         optimizer = torch.optim.Adam(self.module.parameters(), lr=lr)

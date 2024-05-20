@@ -17,9 +17,10 @@ train:
   epochs: 300
   batch_size: 32
   val_split: 0.1
-  lr: 1e-3
+  lr: 2e-4
   kl_weight: 1e-1
-
+  shuffle_train_data: false
+  
 logging:
   use_wandb: false
 
