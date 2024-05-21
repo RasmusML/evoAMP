@@ -10,6 +10,7 @@ from evoamp.data._data_loading import AMPDataLoader, AMPDataset
 from evoamp.models._globals import (
     END_TOKEN,
     PAD_TOKEN,
+    START_TOKEN,
     TOKEN_TO_ID,
     ids_to_sequence,
     prepare_sequence,
@@ -204,6 +205,12 @@ class EvoAMP:
             try:
                 end_index = sample.index(TOKEN_TO_ID[END_TOKEN])
                 sample = sample[:end_index]
+            except ValueError:
+                pass
+
+            try:
+                start_index = len(sample) - 1 - sample[::-1].index(TOKEN_TO_ID[START_TOKEN])
+                sample = sample[start_index + 1 :]
             except ValueError:
                 pass
 

@@ -98,7 +98,7 @@ class Decoder(nn.Module):
             self.delete_logits = nn.Parameter(torch.ones((M, 3, 2)) * indel_scalar)
 
             if scoring_matrix_probabilities is None:
-                substitution_matrix_prob = None
+                substitute_logits = None
             else:
                 S = scoring_matrix_probabilities.shape[0]
                 substitution_matrix_prob = torch.eye(D, B)
