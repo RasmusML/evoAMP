@@ -4,9 +4,12 @@ END_TOKEN = "<end>"
 
 
 def _get_mappings():
+    # Important: Don't change this ordering! The order of the tokens must match the order of the amino acids in the substitution matrices.
     amino_acids = "ACDEFGHIKLMNPQRSTVWY"
 
-    tokens = [PAD_TOKEN] + list(amino_acids) + [START_TOKEN, END_TOKEN]
+    # Important: The amino acids *must* be the first tokens.
+    # We use this assumption when creating the "extended" substitution matrix in the model.
+    tokens = list(amino_acids) + [PAD_TOKEN, START_TOKEN, END_TOKEN]
 
     id_to_token = {}
     token_to_id = {}
