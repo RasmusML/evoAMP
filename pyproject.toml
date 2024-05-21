@@ -7,7 +7,7 @@ name = "evoAMP"
 version = "0.0.1"
 description = "An evolution-guided deep generative model for antimicrobial peptide sequences."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dynamic = ["dependencies"]
 
 [tool.setuptools.dynamic]
