@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 CONFIG_NAME = "config.json"
 MODEL_NAME = "model.pt"
 
-DEFAULT_MAX_SEQUENCE_LENGTH_FOR_SAMPLING = 35
+DEFAULT_MAX_SEQUENCE_LENGTH_FOR_SAMPLING = 45
 
 
 class EvoAMP:
@@ -193,7 +193,7 @@ class EvoAMP:
             pz = inference_output["qz"]
 
         if max_sequence_length is None:
-            max_sequence_length = DEFAULT_MAX_SEQUENCE_LENGTH_FOR_SAMPLING if reference_sequence is None else len(seq)
+            max_sequence_length = DEFAULT_MAX_SEQUENCE_LENGTH_FOR_SAMPLING
 
         sample_ids = []
         for _ in range(n_samples):

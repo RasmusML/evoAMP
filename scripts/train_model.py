@@ -76,7 +76,7 @@ def main(config):
         decoder_lstm_dim=cfg_decoder["lstm_dim"],
         observation_model=cfg_decoder["observation_model"],
         mue_max_latent_sequence_length=mue_max_latent_sequence_length,
-        scoring_matrix=cfg_decoder["scoring_matrix"],
+        scoring_matrix=cfg_decoder.get("scoring_matrix", None),
     )
     history = model.train(df, cfg["train"], log_callback=callback)
 

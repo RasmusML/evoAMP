@@ -143,10 +143,17 @@ class Decoder(nn.Module):
         if self.observation_model == "categorical":
             return SequentialCategorical(logits=xs, pad_token_id=self.pad_token_id)
         elif self.observation_model == "mue":
-            norm_precursor_seq_logits = xs - xs.logsumexp(dim=-1, keepdim=True)
-            norm_insert_seq_logits = self.insert_seq_logits - self.insert_seq_logits.logsumexp(dim=-1, keepdim=True)
-            norm_insert_logits = self.insert_logits - self.insert_logits.logsumexp(dim=-1, keepdim=True)
-            norm_delete_logits = self.delete_logits - self.delete_logits.logsumexp(dim=-1, keepdim=True)
+            C = 1.2
+
+            xs_clamp = xs.clamp(min=-C, max=C)
+            insert_seq_logits_clamp = self.insert_seq_logits.clamp(min=-C, max=C)
+            insert_logit_clamp = self.insert_logits.clamp(min=-C, max=C)
+            delete_logit_clamp = self.delete_logits.clamp(min=-C, max=C)
+
+            norm_precursor_seq_logits = xs_clamp - xs_clamp.logsumexp(dim=-1, keepdim=True)
+            norm_insert_seq_logits = insert_seq_logits_clamp - insert_seq_logits_clamp.logsumexp(dim=-1, keepdim=True)
+            norm_insert_logits = insert_logit_clamp - insert_logit_clamp.logsumexp(dim=-1, keepdim=True)
+            norm_delete_logits = delete_logit_clamp - delete_logit_clamp.logsumexp(dim=-1, keepdim=True)
 
             if self.substitute_logits is not None:
                 norm_substitute_logits = self.substitute_logits - self.substitute_logits.logsumexp(dim=-1, keepdim=True)
